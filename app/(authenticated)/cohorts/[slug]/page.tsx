@@ -47,7 +47,7 @@ export default function Page({
   }
 
   const { data, loading, error, refetch, abort } = useFetch<vols[]>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/cohort/volByCohort/${session.data?.user.auth_id}`,
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/cohort/volByCohort/${params.slug}`,
     {
       headers: {
         authorization: `Bearer ${session.data?.user.auth_token}`,
@@ -58,7 +58,7 @@ export default function Page({
   );
 
   const dataStudents = useFetch<student[]>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/students/getbyCohort/${session.data?.user.auth_id}`,
+    `${process.env.NEXT_PUBLIC_API_BASE_URL}/students/getbyCohort/${params.slug}`,
     {
       headers: {
         authorization: `Bearer ${session.data?.user.auth_token}`,

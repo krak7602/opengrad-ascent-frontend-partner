@@ -155,32 +155,37 @@ export default function Page({
               </Command>
             </PopoverContent>
           </Popover>
-          <Popover open={calOpen} onOpenChange={setCalOpen}>
-            <PopoverTrigger asChild className="w-full">
-              <Button
-                type="button"
-                variant={"outline"}
-                className={cn(
-                  " w-full justify-center font-normal",
-                  !date && "text-muted-foreground",
-                )}
-              >
-                <CalendarDaysIcon className="mr-1 h-4 w-4 -translate-x-1" />
-                {date ? format(date, "PPP") : <span>Select a date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className=" w-full p-0">
-              <Calendar
-                initialFocus
-                mode="single"
-                selected={date}
-                onSelect={(e) => {
-                  setDate(e);
-                  setCalOpen(!calOpen);
-                }}
-              />
-            </PopoverContent>
-          </Popover>
+          <div className="flex flex-row gap-2">
+            <Popover open={calOpen} onOpenChange={setCalOpen}>
+              <PopoverTrigger asChild className="w-full">
+                <Button
+                  type="button"
+                  variant={"outline"}
+                  className={cn(
+                    " w-full justify-center font-normal",
+                    !date && "text-muted-foreground",
+                  )}
+                >
+                  <CalendarDaysIcon className="mr-1 h-4 w-4 -translate-x-1" />
+                  {date ? format(date, "PPP") : <span>Select a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className=" w-full p-0">
+                <Calendar
+                  initialFocus
+                  mode="single"
+                  selected={date}
+                  onSelect={(e) => {
+                    setDate(e);
+                    setCalOpen(!calOpen);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button variant="outline" onClick={refetch}>
+              <RefreshIcon />
+            </Button>
+          </div>
           <div>
             <div className=" pb-2">
               {data?.Logs && data?.isPocVerified && (
@@ -250,3 +255,23 @@ function CalendarDaysIcon(props: { className: string }) {
     </svg>
   );
 }
+
+const RefreshIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    width={24}
+    height={24}
+    color={"#000000"}
+    fill={"none"}
+    {...props}
+  >
+    <path
+      d="M20.0092 2V5.13219C20.0092 5.42605 19.6418 5.55908 19.4537 5.33333C17.6226 3.2875 14.9617 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);

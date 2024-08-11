@@ -22,6 +22,10 @@ import { Button } from "@/components/ui/button";
 import { useFetch } from "@/lib/useFetch";
 import { NotificationTable } from "@/components/partner/NotificationTable";
 import { columns } from "@/components/partner/NotificationColumn";
+import { useQuery } from "@tanstack/react-query";
+import Error from "@/components/Error";
+import Loading from "@/components/Loading";
+import Refetching from "@/components/Refetching";
 
 export default function Page({
   params,
@@ -42,16 +46,32 @@ export default function Page({
     endDate: string;
     poc: poc[];
   }
-  const cohortData = useFetch<cohortColumn[]>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/cohort/poc/${session.data?.user.auth_id}`,
-    {
-      headers: {
-        authorization: `Bearer ${session.data?.user.auth_token}`,
-      },
-      autoInvoke: true,
+  // const cohortData = useFetch<cohortColumn[]>(
+  //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/cohort/poc/${session.data?.user.auth_id}`,
+  //   {
+  //     headers: {
+  //       authorization: `Bearer ${session.data?.user.auth_token}`,
+  //     },
+  //     autoInvoke: true,
+  //   },
+  //   [session],
+  // );
+  const cohortData = useQuery<cohortColumn[]>({
+    queryKey: ["cohortListingFeedback"],
+    queryFn: async () => {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/cohort/poc/${session.data?.user.auth_id}`,
+        {
+          headers: {
+            authorization: `Bearer ${session.data?.user.auth_token}`,
+          },
+        },
+      );
+      return res.json();
     },
-    [session],
-  );
+    refetchOnMount: true,
+    enabled: !!session.data?.user.auth_token,
+  });
   const [recipientCohortCount, setRecipientCohortCount] = useState(0);
   const [recipientPartnerCount, setRecipientPartnerCount] = useState(1);
   const [recipientCohorts, setRecipientCohorts] = useListState<cohortColumn>(
@@ -98,27 +118,60 @@ export default function Page({
     form_id: number;
     receipient_id: number[];
   }
-  const notifDataCohort = useFetch<notif[]>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/notification/cohort/get/${recipientCohorts[0]?.id}`,
-    {
-      headers: {
-        authorization: `Bearer ${session.data?.user.auth_token}`,
-      },
-      autoInvoke: true,
+  // const notifDataCohort = useFetch<notif[]>(
+  //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/notification/cohort/get/${recipientCohorts[0]?.id}`,
+  //   {
+  //     headers: {
+  //       authorization: `Bearer ${session.data?.user.auth_token}`,
+  //     },
+  //     autoInvoke: true,
+  //   },
+  //   [session, recipientCohorts, recipientPartners],
+  // );
+  const notifDataCohort = useQuery<notif[]>({
+    queryKey: ["notifDataCohort"],
+    queryFn: async () => {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/notification/cohort/get/${recipientCohorts[0]?.id}`,
+        {
+          headers: {
+            authorization: `Bearer ${session.data?.user.auth_token}`,
+          },
+        },
+      );
+      return res.json();
     },
-    [session, recipientCohorts, recipientPartners],
-  );
+    refetchOnMount: true,
+    enabled: !!session.data?.user.auth_token,
+  });
 
-  const notifDataPoc = useFetch<notif[]>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/notification/poc/get/${session.data?.user.auth_id}`,
-    {
-      headers: {
-        authorization: `Bearer ${session.data?.user.auth_token}`,
-      },
-      autoInvoke: true,
+  // const notifDataPoc = useFetch<notif[]>(
+  //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/notification/poc/get/${session.data?.user.auth_id}`,
+  //   {
+  //     headers: {
+  //       authorization: `Bearer ${session.data?.user.auth_token}`,
+  //     },
+  //     autoInvoke: true,
+  //   },
+  //   [session, recipientCohorts, recipientPartners],
+  // );
+  //
+  const notifDataPoc = useQuery<notif[]>({
+    queryKey: ["notifDataCohort"],
+    queryFn: async () => {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/notification/poc/get/${recipientPartners[0]?.id}`,
+        {
+          headers: {
+            authorization: `Bearer ${session.data?.user.auth_token}`,
+          },
+        },
+      );
+      return res.json();
     },
-    [session, recipientCohorts, recipientPartners],
-  );
+    refetchOnMount: true,
+    enabled: !!session.data?.user.auth_token,
+  });
   return (
     <div>
       <Tabs defaultValue="new">
@@ -203,7 +256,24 @@ export default function Page({
                 </ToggleGroup>
               </div>
             </div>
-            {notifDataCohort.data &&
+            <div>
+              {notifDataCohort.isError && <Error />}
+              {!notifDataCohort.isError && notifDataCohort.isLoading && (
+                <Loading />
+              )}
+              {!notifDataCohort.isError &&
+                !notifDataCohort.isLoading &&
+                notifDataCohort.data &&
+                notifDataCohort.data.constructor === Array && (
+                  <div>
+                    <NotificationTable
+                      columns={columns}
+                      data={[...notifDataCohort.data].reverse()}
+                    />
+                  </div>
+                )}
+            </div>
+            {/* {notifDataCohort.data &&
               notifDataCohort.data.constructor === Array && (
                 <div>
                   <NotificationTable
@@ -211,8 +281,23 @@ export default function Page({
                     data={[...notifDataCohort.data].reverse()}
                   />
                 </div>
-              )}
-            {notifDataPoc.data &&
+              )} */}
+            <div>
+              {notifDataPoc.isError && <Error />}
+              {!notifDataPoc.isError && notifDataPoc.isLoading && <Loading />}
+              {!notifDataPoc.isError &&
+                !notifDataPoc.isLoading &&
+                notifDataPoc.data &&
+                notifDataPoc.data.constructor === Array && (
+                  <div>
+                    <NotificationTable
+                      columns={columns}
+                      data={[...notifDataPoc.data].reverse()}
+                    />
+                  </div>
+                )}
+            </div>
+            {/* {notifDataPoc.data &&
               notifDataPoc.data.constructor === Array &&
               recipientPartnerCount != 0 && (
                 <div>
@@ -221,7 +306,7 @@ export default function Page({
                     data={[...notifDataPoc.data].reverse()}
                   />
                 </div>
-              )}
+              )} */}
           </div>
         </TabsContent>
       </Tabs>

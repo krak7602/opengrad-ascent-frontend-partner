@@ -89,7 +89,10 @@ export default function Page({
         </div>
       </div>
       <div className="overflow-x-auto">
-        {data && data.constructor === Array && (
+        {isError && <Error />}
+        {!isError && isLoading && <Loading />}
+        {!isError && !isLoading && data && data.constructor === Array && (
+          // { data && data.constructor === Array && (
           <div>
             <VolunteerTable columns={columns} data={data} />
           </div>

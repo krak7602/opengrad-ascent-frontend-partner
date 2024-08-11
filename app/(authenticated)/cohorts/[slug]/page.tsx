@@ -8,6 +8,11 @@ import { useFetch } from "@/lib/useFetch";
 import { StudentTable } from "@/components/partner/StudentTable";
 import { columns as studentColumns } from "@/components/partner/StudentColumn";
 import { AssignVolunteer } from "@/components/partner/AssignVolunteer";
+import { useQuery } from "@tanstack/react-query";
+import Error from "@/components/Error";
+import Loading from "@/components/Loading";
+import Refetching from "@/components/Refetching";
+
 export default function Page({
   params,
   searchParams,
@@ -45,28 +50,69 @@ export default function Page({
     volId: number;
     cohortId: number;
   }
-
-  const { data, loading, error, refetch, abort } = useFetch<vols[]>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/cohort/volByCohort/${params.slug}`,
-    {
-      headers: {
-        authorization: `Bearer ${session.data?.user.auth_token}`,
-      },
-      autoInvoke: true,
+  const { data, isError, isLoading, isRefetching } = useQuery<vols[]>({
+    queryKey: ["volunteer", Number(params.slug)],
+    queryFn: async () => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/cohort/volByCohort/${params.slug}`,
+        {
+          headers: {
+            authorization: `Bearer ${session.data?.user.auth_token}`,
+          },
+        },
+      );
+      return await response.json();
     },
-    [session],
-  );
+    refetchInterval: 10000,
+    staleTime: 60000,
+    enabled: !!session.data?.user.auth_token,
+    refetchOnMount: true,
+  });
 
-  const dataStudents = useFetch<student[]>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/students/getbyCohort/${params.slug}`,
-    {
-      headers: {
-        authorization: `Bearer ${session.data?.user.auth_token}`,
-      },
-      autoInvoke: true,
+  // const { data, loading, error, refetch, abort } = useFetch<vols[]>(
+  //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/cohort/volByCohort/${params.slug}`,
+  //   {
+  //     headers: {
+  //       authorization: `Bearer ${session.data?.user.auth_token}`,
+  //     },
+  //     autoInvoke: true,
+  //   },
+  //   [session],
+  // );
+  const {
+    data: dataStudents,
+    isError: stdErr,
+    isLoading: stdLoading,
+    isRefetching: stdRefetching,
+  } = useQuery<student[]>({
+    queryKey: ["students", Number(params.slug)],
+    queryFn: async () => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/students/getbyCohort/${Number(params.slug)}`,
+        {
+          headers: {
+            authorization: `Bearer ${session.data?.user.auth_token}`,
+          },
+        },
+      );
+      return await response.json();
     },
-    [session],
-  );
+    refetchInterval: 10000,
+    staleTime: 60000,
+    enabled: !!session.data?.user.auth_token,
+    refetchOnMount: true,
+  });
+
+  // const dataStudents = useFetch<student[]>(
+  //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/students/getbyCohort/${params.slug}`,
+  //   {
+  //     headers: {
+  //       authorization: `Bearer ${session.data?.user.auth_token}`,
+  //     },
+  //     autoInvoke: true,
+  //   },
+  //   [session],
+  // );
 
   return (
     <Tabs id="cohort-tab" defaultValue="students">
@@ -91,21 +137,37 @@ export default function Page({
         </div>
         <div className="overflow-x-auto">
           <TabsContent value="students">
-            {dataStudents.data && (
+            {stdRefetching && <Refetching />}
+            {stdErr && <Error />}
+            {!stdErr && stdLoading && <Loading />}
+            {!stdErr && !stdLoading && dataStudents && (
+              <div>
+                <StudentTable columns={studentColumns} data={dataStudents} />
+              </div>
+            )}
+            {/* {dataStudents.data && (
               <div>
                 <StudentTable
                   columns={studentColumns}
                   data={dataStudents.data}
                 />
               </div>
-            )}
+            )} */}
           </TabsContent>
           <TabsContent value="volunteers">
-            {data && data.constructor === Array && (
+            {isRefetching && <Refetching />}
+            {isError && <Error />}
+            {!isError && isLoading && <Loading />}
+            {!isError && !isLoading && data && data.constructor === Array && (
               <div>
                 <VolunteerTable columns={columns} data={data[0].vol} />
               </div>
             )}
+            {/* {data && data.constructor === Array && (
+              <div>
+                <VolunteerTable columns={columns} data={data[0].vol} />
+              </div>
+            )} */}
           </TabsContent>
         </div>
       </div>

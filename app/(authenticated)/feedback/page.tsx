@@ -26,6 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import Error from "@/components/Error";
 import Loading from "@/components/Loading";
 import Refetching from "@/components/Refetching";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Page({
   params,
@@ -35,6 +36,7 @@ export default function Page({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const session = useSession();
+  const queryClient = useQueryClient();
   interface poc {
     id: number;
   }
@@ -82,12 +84,14 @@ export default function Page({
   const [cohortAdd, setCohortAdd] = useState(false);
   const [partnerAdd, setPartnerAdd] = useState(true);
 
-  const AddCohort = (selectedCohort: cohortColumn) => {
+  const AddCohort = async (selectedCohort: cohortColumn) => {
     if (cohortData.data) {
       cohortData.data.forEach((element) => {
         if (element.name === selectedCohort.name) {
           setRecipientCohorts.setState([element]);
           setRecipientCohortCount(1);
+          setRecipientPartners.setState([]);
+          setRecipientPartnerCount(0);
         }
       });
     }
@@ -108,6 +112,9 @@ export default function Page({
       setRecipientCohortCount(0);
       setRecipientPartners.setState([]);
       setRecipientPartnerCount(1);
+      queryClient.invalidateQueries({
+        queryKey: ["notifDataPoc"],
+      });
     }
   };
 
@@ -157,10 +164,10 @@ export default function Page({
   // );
   //
   const notifDataPoc = useQuery<notif[]>({
-    queryKey: ["notifDataCohort"],
+    queryKey: ["notifDataPoc"],
     queryFn: async () => {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/notification/poc/get/${recipientPartners[0]?.id}`,
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/notification/poc/get/${session.data?.user.auth_id}`,
         {
           headers: {
             authorization: `Bearer ${session.data?.user.auth_token}`,
@@ -184,7 +191,7 @@ export default function Page({
         </TabsContent>
         <TabsContent value="search">
           <div className="overflow-x-auto px-1 pt-2">
-            <div className="flex w-full flex-col items-start rounded-md border px-3 py-3">
+            <div className="flex w-full flex-col items-start rounded-md border px-1 py-1">
               <div className="flex w-full flex-row px-1 py-1 items-center justify-between">
                 <Popover open={open} onOpenChange={setOpen}>
                   <PopoverTrigger asChild disabled={partnerAdd}>
@@ -192,7 +199,7 @@ export default function Page({
                       variant="outline"
                       role="combobox"
                       aria-expanded={open}
-                      className="lg:w-fit w-full font-light py-3 rounded-lg px-3  mb-2 flex justify-center items-center mr-2"
+                      className="lg:w-fit w-full font-light py-3 rounded-lg px-3 flex justify-center items-center mr-2"
                     >
                       <div className="mx-2">
                         {recipientCohortCount != 0 && (
@@ -219,7 +226,11 @@ export default function Page({
                                       key={cohort.id}
                                       value={cohort.name}
                                       onSelect={(currentValue) => {
-                                        AddCohort(cohort);
+                                        AddCohort(cohort).then(() => {
+                                          queryClient.invalidateQueries({
+                                            queryKey: ["notifDataCohort"],
+                                          });
+                                        });
                                         setOpen(false);
                                       }}
                                     >
@@ -237,11 +248,13 @@ export default function Page({
                 <ToggleGroup
                   type="single"
                   defaultValue="partners"
-                  className=" ml-1 gap-0 mb-2 rounded bg-slate-200"
+                  className=" ml-1 gap-0 rounded bg-slate-200"
                 >
                   <ToggleGroupItem
                     className=" px-2 font-light rounded-l-sm rounded-r-none data-[state=on]:bg-primary data-[state=on]:text-white"
-                    onClick={() => toggleClick("partners")}
+                    onClick={() => {
+                      toggleClick("partners");
+                    }}
                     value="partners"
                   >
                     <div className=" text-xs">Partner</div>
@@ -264,6 +277,7 @@ export default function Page({
               {!notifDataCohort.isError &&
                 !notifDataCohort.isLoading &&
                 notifDataCohort.data &&
+                recipientCohortCount == 1 &&
                 notifDataCohort.data.constructor === Array && (
                   <div>
                     <NotificationTable
@@ -288,6 +302,7 @@ export default function Page({
               {!notifDataPoc.isError &&
                 !notifDataPoc.isLoading &&
                 notifDataPoc.data &&
+                recipientPartnerCount == 1 &&
                 notifDataPoc.data.constructor === Array && (
                   <div>
                     <NotificationTable

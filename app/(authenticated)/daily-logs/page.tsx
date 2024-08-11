@@ -20,6 +20,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { useQuery } from "@tanstack/react-query";
+import Error from "@/components/Error";
+import Loading from "@/components/Loading";
+import Refetching from "@/components/Refetching";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function Page({
   params,
@@ -33,6 +38,7 @@ export default function Page({
   const [selectedVolunteer, setSelectedVolunteer] = useState<vol>();
   const [open, setOpen] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   interface user_id {
     id: number;
@@ -50,17 +56,34 @@ export default function Page({
     poc: poc;
     user_id: user_id;
   }
-
-  const vols = useFetch<vol[]>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/volbyPoc/${session.data?.user.auth_id}`,
-    {
-      headers: {
-        authorization: `Bearer ${session.data?.user.auth_token}`,
-      },
-      autoInvoke: true,
+  const vols = useQuery<vol[]>({
+    queryKey: ["volsLog"],
+    queryFn: async () => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/volbyPoc/${session.data?.user.auth_id}`,
+        {
+          headers: {
+            authorization: `Bearer ${session.data?.user.auth_token}`,
+          },
+        },
+      );
+      return await response.json();
     },
-    [session],
-  );
+    refetchInterval: 10000,
+    staleTime: 60000,
+    enabled: !!session.data?.user.auth_token,
+    refetchOnMount: true,
+  });
+  // const vols = useFetch<vol[]>(
+  //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/volbyPoc/${session.data?.user.auth_id}`,
+  //   {
+  //     headers: {
+  //       authorization: `Bearer ${session.data?.user.auth_token}`,
+  //     },
+  //     autoInvoke: true,
+  //   },
+  //   [session],
+  // );
 
   interface slotItem {
     id: number;
@@ -80,28 +103,73 @@ export default function Page({
     Logs: slotItem[];
   }
 
-  const { data, loading, error, refetch, abort } = useFetch<logDay>(
-    `${process.env.NEXT_PUBLIC_API_BASE_URL}/attendence/get/${selectedVolunteer?.id}/${date ? date.getMonth() + 1 : ""}-${date?.getDate()}-${date?.getFullYear()}`,
-    {
-      headers: {
-        authorization: `Bearer ${session.data?.user.auth_token}`,
-      },
-      autoInvoke: true,
+  const { data, isError, isLoading, isRefetching } = useQuery<logDay>({
+    queryKey: ["dailyLog"],
+    queryFn: async () => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/attendence/get/${selectedVolunteer?.id}/${date ? date.getMonth() + 1 : ""}-${date?.getDate()}-${date?.getFullYear()}`,
+        {
+          headers: {
+            authorization: `Bearer ${session.data?.user.auth_token}`,
+          },
+        },
+      );
+      return await response.json();
     },
-    [session, date],
-  );
+    refetchInterval: 10000,
+    staleTime: 60000,
+    enabled: !!session.data?.user.auth_token,
+    refetchOnMount: true,
+  });
 
-  const setVerified = async () => {
-    try {
-      if (data) {
+  // const { data, loading, error, refetch, abort } = useFetch<logDay>(
+  //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/attendence/get/${selectedVolunteer?.id}/${date ? date.getMonth() + 1 : ""}-${date?.getDate()}-${date?.getFullYear()}`,
+  //   {
+  //     headers: {
+  //       authorization: `Bearer ${session.data?.user.auth_token}`,
+  //     },
+  //     autoInvoke: true,
+  //   },
+  //   [session, date],
+  // );
+
+  const mutation = useMutation({
+    mutationKey: ["setVerified"],
+    mutationFn: async (data: any) => {
+      try {
         const resp = await axios.get(
           `${process.env.NEXT_PUBLIC_API_BASE_URL}/attendence/poc/${data.id}`,
           {
             headers: {
-              authorization: `Bearer ${session.data?.user.auth_token}`,
+              Authorization: `Bearer ${session.data?.user.auth_token}`,
             },
           },
         );
+
+        // if (resp.data.id) {
+        //   return { id: resp.data.id, name: studName, email: studEmail };
+        // }
+      } catch (e) {
+        console.log(e);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["dailyLog"] });
+    },
+  });
+
+  const setVerified = async () => {
+    try {
+      if (data) {
+        mutation.mutate(data);
+        // const resp = await axios.get(
+        //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/attendence/poc/${data.id}`,
+        //   {
+        //     headers: {
+        //       authorization: `Bearer ${session.data?.user.auth_token}`,
+        //     },
+        //   },
+        // );
       }
     } catch (e) {
       console.log(e);
@@ -110,120 +178,130 @@ export default function Page({
 
   return (
     <div className="container mx-auto my-6 px-4 sm:px-6 lg:px-8">
-      <div className="overflow-x-auto px-1 pt-2">
-        <div className="flex flex-col gap-3">
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild className="w-full">
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                className="w-full font-light py-3 rounded-lg px-3  mb-2 flex justify-center items-center mr-2"
-              >
-                <div className="mx-2">
-                  {selectedVolunteer && (
-                    <div>{selectedVolunteer?.user_id?.name}</div>
-                  )}
-                  {!selectedVolunteer && <div>Select volunteer</div>}
-                </div>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className=" w-full p-0">
-              <Command>
-                <CommandInput placeholder="Add Recipient" />
-                <CommandList>
-                  <CommandEmpty>No recipient found.</CommandEmpty>
-                  <CommandGroup>
-                    {vols.data && vols.data.constructor === Array && (
-                      <div>
-                        {vols.data.map((volDat) => (
-                          <CommandItem
-                            key={volDat.id}
-                            value={volDat.user_id.name}
-                            onSelect={(currentValue) => {
-                              setSelectedVolunteer(volDat);
-                              setOpen(false);
-                            }}
-                          >
-                            {volDat.user_id.name}
-                          </CommandItem>
-                        ))}
-                      </div>
-                    )}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          <div className="flex flex-row gap-2">
-            <Popover open={calOpen} onOpenChange={setCalOpen}>
+      {isRefetching && <Refetching />}
+      {isError && <Error />}
+      {!isError && isLoading && <Loading />}
+      {!isError && !isLoading && (
+        <div className="overflow-x-auto px-1 pt-2">
+          <div className="flex flex-col gap-3">
+            <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild className="w-full">
                 <Button
-                  type="button"
-                  variant={"outline"}
-                  className={cn(
-                    " w-full justify-center font-normal",
-                    !date && "text-muted-foreground",
-                  )}
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={open}
+                  className="w-full font-light py-3 rounded-lg px-3  mb-2 flex justify-center items-center mr-2"
                 >
-                  <CalendarDaysIcon className="mr-1 h-4 w-4 -translate-x-1" />
-                  {date ? format(date, "PPP") : <span>Select a date</span>}
+                  <div className="mx-2">
+                    {selectedVolunteer && (
+                      <div>{selectedVolunteer?.user_id?.name}</div>
+                    )}
+                    {!selectedVolunteer && <div>Select volunteer</div>}
+                  </div>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="start" className=" w-full p-0">
-                <Calendar
-                  initialFocus
-                  mode="single"
-                  selected={date}
-                  onSelect={(e) => {
-                    setDate(e);
-                    setCalOpen(!calOpen);
-                  }}
-                />
+              <PopoverContent className=" w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Add Recipient" />
+                  <CommandList>
+                    <CommandEmpty>No recipient found.</CommandEmpty>
+                    <CommandGroup>
+                      {vols.data && vols.data.constructor === Array && (
+                        <div>
+                          {vols.data.map((volDat) => (
+                            <CommandItem
+                              key={volDat.id}
+                              value={volDat.user_id.name}
+                              onSelect={(currentValue) => {
+                                setSelectedVolunteer(volDat);
+                                setOpen(false);
+                              }}
+                            >
+                              {volDat.user_id.name}
+                            </CommandItem>
+                          ))}
+                        </div>
+                      )}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
               </PopoverContent>
             </Popover>
-            <Button variant="outline" onClick={refetch}>
-              <RefreshIcon />
-            </Button>
-          </div>
-          <div>
-            <div className=" pb-2">
-              {data?.Logs && data?.isPocVerified && (
-                <Button
-                  type="button"
-                  className=" bg-blue-600 hover:bg-blue-600 text-gray-100 font-semibold rounded-md px-2 py-2
-                             w-full text-center"
-                >
-                  Verified
-                </Button>
-              )}
-              {data?.Logs && !data?.isPocVerified && (
-                <Button
-                  className=" bg-red-500 hover:bg-red-500 text-gray-100 font-semibold rounded-md px-2 py-2
-                             w-full text-center"
-                  onClick={setVerified}
-                >
-                  Not Verified
-                </Button>
-              )}
+            <div className="flex flex-row gap-2">
+              <Popover open={calOpen} onOpenChange={setCalOpen}>
+                <PopoverTrigger asChild className="w-full">
+                  <Button
+                    type="button"
+                    variant={"outline"}
+                    className={cn(
+                      " w-full justify-center font-normal",
+                      !date && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarDaysIcon className="mr-1 h-4 w-4 -translate-x-1" />
+                    {date ? format(date, "PPP") : <span>Select a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className=" w-full p-0">
+                  <Calendar
+                    initialFocus
+                    mode="single"
+                    selected={date}
+                    onSelect={(e) => {
+                      setDate(e);
+                      setCalOpen(!calOpen);
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ["dailyLog"] });
+                }}
+              >
+                <RefreshIcon />
+              </Button>
             </div>
             <div>
-              {data?.Logs?.map((slot, index) => (
-                <div key={index}>
-                  <div className="flex text-pretty">
-                    <div className=" text-lg font-semibold">
-                      Slot #{index + 1}: {slot.activity} ({slot.hourStart}:
-                      {slot.minStart} - {slot.hourEnd}:{slot.minEnd})
+              <div className=" pb-2">
+                {data?.Logs && data?.isPocVerified && (
+                  <Button
+                    type="button"
+                    className=" bg-blue-600 hover:bg-blue-600 text-gray-100 font-semibold rounded-md px-2 py-2
+                               w-full text-center"
+                  >
+                    Verified
+                  </Button>
+                )}
+                {data?.Logs && !data?.isPocVerified && (
+                  <Button
+                    className=" bg-red-500 hover:bg-red-500 text-gray-100 font-semibold rounded-md px-2 py-2
+                               w-full text-center"
+                    onClick={setVerified}
+                  >
+                    Not Verified
+                  </Button>
+                )}
+              </div>
+              <div>
+                {data?.Logs?.map((slot, index) => (
+                  <div key={index}>
+                    <div className="flex text-pretty">
+                      <div className=" text-lg font-semibold">
+                        Slot #{index + 1}: {slot.activity} ({slot.hourStart}:
+                        {slot.minStart} - {slot.hourEnd}:{slot.minEnd})
+                      </div>
                     </div>
+                    <div>{slot.details}</div>
+                    <div></div>
                   </div>
-                  <div>{slot.details}</div>
-                  <div></div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSession } from "next-auth/react";
 import axios from "axios";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 
 export function AddVolunteer() {
   const [open, setOpen] = React.useState(false);
@@ -22,17 +23,29 @@ export function AddVolunteer() {
   const [volEmail, setVolEmail] = React.useState("");
   const [send, setSend] = React.useState(false);
   const isDesktop = useMediaQuery("(min-width: 768px)");
+  const queryClient = useQueryClient();
   const session = useSession();
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (volEmail && volName) {
-        const resp = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/volinvite`,
+  const mutation = useMutation({
+    mutationKey: ["createVolunteer"],
+    mutationFn: async (data: { volName: string; volEmail: string }) => {
+      const invite_resp = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/volinvite`,
+        {
+          name: data.volName,
+          email: data.volEmail,
+        },
+        {
+          headers: {
+            authorization: `Bearer ${session.data?.user.auth_token}`,
+          },
+        },
+      );
+
+      if (invite_resp.data.id) {
+        const profileset_resp = await axios.post(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/profileset`,
           {
-            name: volName,
-            email: volEmail,
-            Poc: session.data?.user.auth_id,
+            destination: data.volEmail,
           },
           {
             headers: {
@@ -40,23 +53,53 @@ export function AddVolunteer() {
             },
           },
         );
-
-        if (resp.data.id) {
-          const resp = await axios.post(
-            `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/profileset`,
-            {
-              destination: volEmail,
-            },
-            {
-              headers: {
-                authorization: `Bearer ${session.data?.user.auth_token}`,
-              },
-            },
-          );
-          if (resp.data.success) {
-            setSend(true);
-          }
+        if (profileset_resp.data.success) {
+          setSend(true);
+          return profileset_resp;
         }
+      }
+    },
+    onSettled: () => {
+      setSend(true);
+      setVolName("");
+      setVolEmail("");
+      queryClient.invalidateQueries({ queryKey: ["volInviteList"] });
+    },
+  });
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (volEmail && volName) {
+        mutation.mutate({ volName, volEmail });
+        // const resp = await axios.post(
+        //   `${process.env.NEXT_PUBLIC_API_BASE_URL}/user/volinvite`,
+        //   {
+        //     name: volName,
+        //     email: volEmail,
+        //     Poc: session.data?.user.auth_id,
+        //   },
+        //   {
+        //     headers: {
+        //       authorization: `Bearer ${session.data?.user.auth_token}`,
+        //     },
+        //   },
+        // );
+        // if (resp.data.id) {
+        //   const resp = await axios.post(
+        //     `${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/profileset`,
+        //     {
+        //       destination: volEmail,
+        //     },
+        //     {
+        //       headers: {
+        //         authorization: `Bearer ${session.data?.user.auth_token}`,
+        //       },
+        //     },
+        //   );
+        //   if (resp.data.success) {
+        //     setSend(true);
+        //   }
+        // }
       }
     } catch (e) {
       console.log(e);
